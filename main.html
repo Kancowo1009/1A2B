@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>1A2B 多模式雙人 P2P 對戰版</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- PeerJS CDN -->
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <!-- FontAwesome 圖示 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col items-center justify-center p-4 font-sans">
+
+    <div class="max-w-2xl w-full bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl p-6 md:p-8 space-y-6">
+        
+        <!-- Header -->
+        <div class="text-center space-y-2">
+            <h1 class="text-3xl font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">
+                1A2B 多模式雙人 P2P 對戰
+            </h1>
+            <p class="text-sm text-slate-400">WebRTC 點對點連線，選擇模式後即可開戰！</p>
+        </div>
+
+        <!-- 步驟 1：模式選擇與連線設定 -->
+        <div id="setup-section" class="space-y-5 bg-slate-900/50 p-5 rounded-xl border border-slate-700/50">
+            <h2 class="text-lg font-semibold text-cyan-400 flex items-center gap-2">
+                <i class="fa-solid fa-gamepad"></i> 1. 選擇遊戲模式與連線
+            </h2>
+
+            <!-- 模式選擇 (房主決定) -->
+            <div class="space-y-2">
+                <label class="text-xs font-bold text-slate-400 uppercase tracking-wider">選擇對戰模式 (房主設定)</label>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <label class="cursor-pointer bg-slate-800 border border-slate-700 p-3 rounded-xl flex flex-col justify-between hover:border-cyan-500 transition-all has-[:checked]:border-cyan-400 has-[:checked]:bg-cyan-950/30">
+                        <input type="radio" name="game-mode" value="classic" checked class="sr-only">
+                        <div>
+                            <div class="font-bold text-cyan-300 text-sm">經典模式</div>
+                            <div class="text-xs text-slate-400 mt-1">數字不重複，傳統 1A2B 判定。</div>
+                        </div>
+                    </label>
+
+                    <label class="cursor-pointer bg-slate-800 border border-slate-700 p-3 rounded-xl flex flex-col justify-between hover:border-amber-500 transition-all has-[:checked]:border-amber-400 has-[:checked]:bg-amber-950/30">
+                        <input type="radio" name="game-mode" value="repeat" class="sr-only">
+                        <div>
+                            <div class="font-bold text-amber-300 text-sm">重複數字版</div>
+                            <div class="text-xs text-slate-400 mt-1">允許數字重複，加入 C（溢位次數）判定。</div>
+                        </div>
+                    </label>
+
+                    <label class="cursor-pointer bg-slate-800 border border-slate-700 p-3 rounded-xl flex flex-col justify-between hover:border-rose-500 transition-all has-[:checked]:border-rose-400 has-[:checked]:bg-rose-950/30">
+                        <input type="radio" name="game-mode" value="fog" class="sr-only">
+                        <div>
+                            <div class="font-bold text-rose-300 text-sm">資訊遮蔽版</div>
+                            <div class="text-xs text-slate-400 mt-1">不重複數字，每人擁有一次「煙霧彈」發動權。</div>
+                        </div>
+                    </label>
+                </div>
+            </div>
+            
+            <!-- 房間建立與加入 -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-slate-800">
+                <!-- 房主（Host） -->
+                <div class="space-y-2 bg-slate-800 p-4 rounded-lg border border-slate-700">
+                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">選項 A：建立房間 (Host)</span>
+                    <button id="btn-create-room" onclick="createRoom()" class="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-medium py-2 rounded-lg transition-all flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-plus-circle"></i> 建立房間 ID
+                    </button>
+                    <div id="host-id-container" class="hidden space-y-1">
+                        <label class="text-xs text-slate-400">將 ID 發給朋友：</label>
+                        <div class="flex gap-2">
+                            <input id="my-peer-id" type="text" readonly class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-sm font-mono text-cyan-300 focus:outline-none">
+                            <button onclick="copyPeerId()" class="bg-slate-700 hover:bg-slate-600 text-xs px-3 py-1 rounded">複製</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 訪客（Joiner） -->
+                <div class="space-y-2 bg-slate-800 p-4 rounded-lg border border-slate-700">
+                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">選項 B：加入房間 (Client)</span>
+                    <input id="join-peer-id" type="text" placeholder="貼上對手的房間 ID" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm font-mono text-white focus:outline-none focus:border-cyan-500">
+                    <button id="btn-join-room" onclick="joinRoom()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-medium py-2 rounded-lg transition-all flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-right-to-bracket"></i> 連線對手
+                    </button>
+                </div>
+            </div>
+
+            <!-- 連線狀態提示 -->
+            <div id="connection-status" class="text-center text-sm font-medium text-amber-400 flex items-center justify-center gap-2">
+                <i class="fa-solid fa-circle-notch animate-spin"></i> 初始化 P2P 網路中...
+            </div>
+        </div>
+
+        <!-- 步驟 2：出題階段 -->
+        <div id="secret-setup-section" class="hidden space-y-4 bg-slate-900/50 p-5 rounded-xl border border-slate-700/50">
+            <div class="flex justify-between items-center border-b border-slate-700 pb-3">
+                <h2 class="text-lg font-semibold text-cyan-400 flex items-center gap-2">
+                    <i class="fa-solid fa-key"></i> 2. 設定給對方猜的四位數
+                </h2>
+                <span id="active-mode-badge" class="px-3 py-1 rounded-full text-xs font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                    模式：--
+                </span>
+            </div>
+            
+            <div class="flex gap-3">
+                <input id="input-my-secret" type="text" maxlength="4" placeholder="例如：1234" class="bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-xl font-mono text-center tracking-widest text-white focus:outline-none focus:border-cyan-500 flex-1">
+                <button onclick="submitSecretNumber()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-6 py-2 rounded-lg transition-all">
+                    鎖定答案
+                </button>
+            </div>
+            <p id="secret-status-text" class="text-xs text-slate-400">請輸入 4 位數字...</p>
+        </div>
+
+        <!-- 步驟 3：對戰遊戲主區塊 -->
+        <div id="game-section" class="hidden space-y-6">
+            <!-- 回合與狀態提示 bar -->
+            <div class="flex justify-between items-center bg-slate-900 p-3 rounded-xl border border-slate-700 text-sm">
+                <div>身份：<span id="player-role-badge" class="font-bold text-cyan-400">--</span></div>
+                <div id="turn-indicator" class="font-bold px-3 py-1 rounded-full text-xs bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                    等待開始...
+                </div>
+            </div>
+
+            <!-- 猜測與技能區域 -->
+            <div class="space-y-3">
+                <div class="flex gap-3">
+                    <input id="input-guess" type="text" maxlength="4" disabled placeholder="輸入猜測 4 位數..." class="bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-xl font-mono text-center tracking-widest text-white focus:outline-none focus:border-cyan-500 flex-1 disabled:opacity-50">
+                    <button id="btn-submit-guess" onclick="makeGuess()" disabled class="bg-cyan-600 hover:bg-cyan-500 disabled:bg-slate-700 text-white font-semibold px-6 py-3 rounded-lg transition-all disabled:cursor-not-allowed">
+                        猜！
+                    </button>
+                </div>
+
+                <!-- 資訊遮蔽版專用道具 -->
+                <div id="fog-skill-container" class="hidden flex justify-between items-center bg-rose-950/30 border border-rose-900/50 p-3 rounded-lg">
+                    <div class="text-xs text-rose-300">
+                        <i class="fa-solid fa-smog"></i> <strong>煙霧彈：</strong> 使用後對方本輪猜測的結果將顯示為 <code class="bg-slate-900 px-1 py-0.5 rounded text-rose-400">?A?B</code>。
+                    </div>
+                    <button id="btn-use-fog" onclick="toggleFogSkill()" disabled class="bg-rose-700 hover:bg-rose-600 text-white text-xs px-3 py-1.5 rounded transition-all font-bold disabled:opacity-50">
+                        發動煙霧彈 (剩餘 1 次)
+                    </button>
+                </div>
+            </div>
+
+            <!-- 對戰歷史紀錄 (雙欄對比) -->
+            <div class="grid grid-cols-2 gap-4">
+                <!-- 我猜對方的紀錄 -->
+                <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-700/60 space-y-3">
+                    <h3 class="text-xs font-bold text-cyan-400 uppercase tracking-wider text-center border-b border-slate-700 pb-2">
+                        我猜對方的紀錄
+                    </h3>
+                    <div id="my-guess-history" class="space-y-2 max-h-60 overflow-y-auto pr-1 text-sm font-mono"></div>
+                </div>
+
+                <!-- 對手猜我的紀錄 -->
+                <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-700/60 space-y-3">
+                    <h3 class="text-xs font-bold text-rose-400 uppercase tracking-wider text-center border-b border-slate-700 pb-2">
+                        對手猜我的紀錄
+                    </h3>
+                    <div id="opponent-guess-history" class="space-y-2 max-h-60 overflow-y-auto pr-1 text-sm font-mono"></div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // 全域狀態管理
+        let peer = null;
+        let conn = null;
+        let selectedMode = "classic"; // classic, repeat, fog
+        let mySecretNumber = "";
+        let isMyTurn = false;
+        let isHost = false;
+
+        // 資訊遮蔽版道具狀態
+        let hasFogSkill = true;
+        let fogActiveThisTurn = false;
+
+        // 初始化 PeerJS
+        function initPeer() {
+            peer = new Peer();
+
+            peer.on('open', (id) => {
+                document.getElementById('connection-status').innerHTML = 
+                    `<span class="text-emerald-400"><i class="fa-solid fa-check-circle"></i> P2P 網路已就緒</span>`;
+            });
+
+            peer.on('connection', (incomingConn) => {
+                conn = incomingConn;
+                isHost = true;
+                
+                // 房主讀取選擇的模式
+                const modeRadios = document.getElementsByName('game-mode');
+                for (let r of modeRadios) {
+                    if (r.checked) selectedMode = r.value;
+                }
+
+                setupConnectionListeners();
+                document.getElementById('connection-status').innerHTML = 
+                    `<span class="text-emerald-400"><i class="fa-solid fa-link"></i> 玩家已連線！同步模式中...</span>`;
+            });
+
+            peer.on('error', (err) => {
+                console.error(err);
+                document.getElementById('connection-status').innerHTML = 
+                    `<span class="text-rose-400"><i class="fa-solid fa-triangle-exclamation"></i> 連線錯誤: ${err.type}</span>`;
+            });
+        }
+
+        function createRoom() {
+            if (!peer || !peer.id) return;
+            document.getElementById('my-peer-id').value = peer.id;
+            document.getElementById('host-id-container').classList.remove('hidden');
+            document.getElementById('connection-status').innerHTML = 
+                `<span class="text-amber-400"><i class="fa-solid fa-spinner animate-spin"></i> 等待對手輸入 ID 加入...</span>`;
+        }
+
+        function joinRoom() {
+            const targetId = document.getElementById('join-peer-id').value.trim();
+            if (!targetId) return alert('請輸入對手的房間 ID！');
+            
+            document.getElementById('connection-status').innerHTML = 
+                `<span class="text-amber-400"><i class="fa-solid fa-spinner animate-spin"></i> 連線對手中...</span>`;
+            
+            conn = peer.connect(targetId);
+            isHost = false;
+            setupConnectionListeners();
+        }
+
+        function setupConnectionListeners() {
+            conn.on('open', () => {
+                if (isHost) {
+                    // 房主發送選擇的遊戲模式給訪客
+                    sendP2PData({ type: 'INIT_MODE', mode: selectedMode });
+                    switchToSecretSetup();
+                }
+            });
+
+            conn.on('data', (data) => handleIncomingData(data));
+            conn.on('close', () => {
+                alert('對方已斷開連線！');
+                location.reload();
+            });
+        }
+
+        function copyPeerId() {
+            const input = document.getElementById('my-peer-id');
+            input.select();
+            navigator.clipboard.writeText(input.value);
+            alert('已複製房間 ID！');
+        }
+
+        function switchToSecretSetup() {
+            document.getElementById('setup-section').classList.add('hidden');
+            document.getElementById('secret-setup-section').classList.remove('hidden');
+
+            const badge = document.getElementById('active-mode-badge');
+            const hint = document.getElementById('secret-status-text');
+
+            if (selectedMode === 'classic') {
+                badge.innerText = "模式：經典版 (不重複)";
+                hint.innerText = "請輸入 4 個不重複數字 (0-9)...";
+            } else if (selectedMode === 'repeat') {
+                badge.innerText = "模式：重複數字版 (1A2B2C)";
+                badge.className = "px-3 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30";
+                hint.innerText = "可輸入重複數字 (例如：1123)...";
+            } else if (selectedMode === 'fog') {
+                badge.innerText = "模式：資訊遮蔽版 (含煙霧彈)";
+                badge.className = "px-3 py-1 rounded-full text-xs font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30";
+                hint.innerText = "請輸入 4 個不重複數字 (0-9)...";
+            }
+        }
+
+        // 規則驗證
+        function isValidGuess(num) {
+            if (!/^\d{4}$/.test(num)) return false;
+            if (selectedMode !== 'repeat') {
+                // 經典與遮蔽版不允許重複數字
+                return new Set(num).size === 4;
+            }
+            return true;
+        }
+
+        function submitSecretNumber() {
+            const val = document.getElementById('input-my-secret').value.trim();
+            if (!isValidGuess(val)) {
+                return alert(selectedMode === 'repeat' ? '請輸入 4 位數字（0-9）！' : '請輸入 4 個不重複數字！');
+            }
+
+            mySecretNumber = val;
+            document.getElementById('secret-status-text').innerText = "已鎖定題目！等待對方設定...";
+            document.getElementById('input-my-secret').disabled = true;
+
+            sendP2PData({ type: 'SECRET_READY' });
+            checkReadyToStart();
+        }
+
+        let opponentSecretReady = false;
+
+        function checkReadyToStart() {
+            if (mySecretNumber && opponentSecretReady) {
+                document.getElementById('secret-setup-section').classList.add('hidden');
+                document.getElementById('game-section').classList.remove('hidden');
+                
+                if (selectedMode === 'fog') {
+                    document.getElementById('fog-skill-container').classList.remove('hidden');
+                }
+
+                isMyTurn = isHost;
+                document.getElementById('player-role-badge').innerText = isHost ? "房主 (先攻)" : "訪客 (後攻)";
+                updateTurnUI();
+            }
+        }
+
+        // 核心演算法：計算 1A2B 或 1A2B2C
+        function calculateResult(guessStr, targetStr) {
+            const guess = guessStr.split('');
+            const target = targetStr.split('');
+            let a = 0, b = 0, c = 0;
+
+            const targetUsed = [false, false, false, false];
+            const guessUsed = [false, false, false, false];
+
+            // 1. 計算 A
+            for (let i = 0; i < 4; i++) {
+                if (guess[i] === target[i]) {
+                    a++;
+                    targetUsed[i] = true;
+                    guessUsed[i] = true;
+                }
+            }
+
+            // 2. 計算 B
+            for (let i = 0; i < 4; i++) {
+                if (guessUsed[i]) continue;
+                for (let j = 0; j < 4; j++) {
+                    if (!targetUsed[j] && guess[i] === target[j]) {
+                        b++;
+                        targetUsed[j] = true;
+                        guessUsed[i] = true;
+                        break;
+                    }
+                }
+            }
+
+            // 3. 計算 C (僅在重複數字版生效：多餘的溢位命中)
+            if (selectedMode === 'repeat') {
+                for (let i = 0; i < 4; i++) {
+                    if (!guessUsed[i] && target.includes(guess[i])) {
+                        c++;
+                    }
+                }
+                return `${a}A${b}B${c}C`;
+            }
+
+            return `${a}A${b}B`;
+        }
+
+        function handleIncomingData(data) {
+            switch(data.type) {
+                case 'INIT_MODE':
+                    selectedMode = data.mode;
+                    switchToSecretSetup();
+                    break;
+
+                case 'SECRET_READY':
+                    opponentSecretReady = true;
+                    checkReadyToStart();
+                    break;
+
+                case 'GUESS':
+                    const guessVal = data.guess;
+                    let realResult = calculateResult(guessVal, mySecretNumber);
+                    let displayResultForOpponent = realResult;
+
+                    // 如果我發動了煙霧彈
+                    if (fogActiveThisTurn) {
+                        displayResultForOpponent = "?A?B";
+                        fogActiveThisTurn = false; // 消耗掉本輪遮蔽
+                        document.getElementById('btn-use-fog').innerText = "煙霧彈 (已使用)";
+                        document.getElementById('btn-use-fog').disabled = true;
+                        hasFogSkill = false;
+                    }
+
+                    renderHistory('opponent-guess-history', guessVal, `${realResult} (給對方: ${displayResultForOpponent})`);
+
+                    sendP2PData({
+                        type: 'GUESS_RESULT',
+                        guess: guessVal,
+                        result: displayResultForOpponent,
+                        isWin: realResult.startsWith('4A')
+                    });
+
+                    if (realResult.startsWith('4A')) {
+                        alert('對手猜中了你的數字！你輸了！');
+                        endGame(false);
+                    } else {
+                        isMyTurn = true;
+                        updateTurnUI();
+                    }
+                    break;
+
+                case 'GUESS_RESULT':
+                    renderHistory('my-guess-history', data.guess, data.result);
+
+                    if (data.isWin) {
+                        alert('🎉 恭喜你！成功破解對手的數字獲得勝利！');
+                        endGame(true);
+                    } else {
+                        isMyTurn = false;
+                        updateTurnUI();
+                    }
+                    break;
+            }
+        }
+
+        function sendP2PData(data) {
+            if (conn && conn.open) conn.send(data);
+        }
+
+        // 切換發動煙霧彈狀態
+        function toggleFogSkill() {
+            if (!hasFogSkill) return;
+            fogActiveThisTurn = !fogActiveThisTurn;
+            const btn = document.getElementById('btn-use-fog');
+            if (fogActiveThisTurn) {
+                btn.className = "bg-amber-600 hover:bg-amber-500 text-white text-xs px-3 py-1.5 rounded transition-all font-bold animate-pulse";
+                btn.innerText = "發動中 (本輪生效)";
+            } else {
+                btn.className = "bg-rose-700 hover:bg-rose-600 text-white text-xs px-3 py-1.5 rounded transition-all font-bold";
+                btn.innerText = "發動煙霧彈 (剩餘 1 次)";
+            }
+        }
+
+        function makeGuess() {
+            if (!isMyTurn) return;
+            const input = document.getElementById('input-guess');
+            const val = input.value.trim();
+
+            if (!isValidGuess(val)) {
+                return alert(selectedMode === 'repeat' ? '請輸入 4 位數字！' : '請輸入 4 個不重複數字！');
+            }
+
+            input.value = '';
+            isMyTurn = false;
+            updateTurnUI();
+
+            sendP2PData({ type: 'GUESS', guess: val });
+        }
+
+        function updateTurnUI() {
+            const indicator = document.getElementById('turn-indicator');
+            const guessInput = document.getElementById('input-guess');
+            const guessBtn = document.getElementById('btn-submit-guess');
+            const fogBtn = document.getElementById('btn-use-fog');
+
+            if (isMyTurn) {
+                indicator.innerText = "你的回合！請猜數字";
+                indicator.className = "font-bold px-3 py-1 rounded-full text-xs bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 animate-pulse";
+                guessInput.disabled = false;
+                guessBtn.disabled = false;
+                if (hasFogSkill) fogBtn.disabled = false;
+                guessInput.focus();
+            } else {
+                indicator.innerText = "等待對手思考中...";
+                indicator.className = "font-bold px-3 py-1 rounded-full text-xs bg-amber-500/20 text-amber-300 border border-amber-500/30";
+                guessInput.disabled = true;
+                guessBtn.disabled = true;
+                fogBtn.disabled = true;
+            }
+        }
+
+        function renderHistory(elementId, guess, result) {
+            const container = document.getElementById(elementId);
+            const item = document.createElement('div');
+            item.className = "flex justify-between items-center bg-slate-800 px-3 py-1.5 rounded border border-slate-700/50";
+            
+            const isWin = result.startsWith('4A');
+            const badgeClass = isWin ? 'text-emerald-400 font-bold' : (result.includes('?A') ? 'text-rose-400 font-bold' : 'text-cyan-300');
+
+            item.innerHTML = `
+                <span class="tracking-widest text-slate-200">${guess}</span>
+                <span class="${badgeClass}">${result}</span>
+            `;
+            container.prepend(item);
+        }
+
+        function endGame(iWin) {
+            document.getElementById('input-guess').disabled = true;
+            document.getElementById('btn-submit-guess').disabled = true;
+            document.getElementById('btn-use-fog').disabled = true;
+            const indicator = document.getElementById('turn-indicator');
+            indicator.innerText = iWin ? "遊戲結束 - 你贏了！" : "遊戲結束 - 你輸了！";
+            indicator.className = iWin 
+                ? "font-bold px-3 py-1 rounded-full text-xs bg-emerald-500 text-white" 
+                : "font-bold px-3 py-1 rounded-full text-xs bg-rose-500 text-white";
+        }
+
+        window.onload = initPeer;
+    </script>
+</body>
+</html>
